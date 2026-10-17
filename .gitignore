@@ -1,0 +1,32 @@
+# Python and macOS
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
+
+# Made on this computer, or downloaded again when needed
+.cache/
+library/
+songs/
+playtest/
+backups/
+
+# Tests: the downloaded songs (tests/fetch_songs.py), their cache, run output and logs,
+# and the browser used for screenshots
+tests/songs/
+tests/cache/
+tests/out/
+tests/browser/
+tests/*.log
+tests/suite.done
+
+# Research: other people's beatmaps and audio, copies of the osu! wiki, the pattern
+# glossary image, and what the tools cache and print
+research/Osu Songs For Reference/
+research/reference/
+research/examples/
+research/demos/
+research/cache/
+research/logs/
+research/notes/osu-wiki/
+research/notes/pattern_glossary-osumania.webp

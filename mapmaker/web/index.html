@@ -1,0 +1,848 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mapmaker</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #1c1e24; --panel: #24272f; --well: #1f2229; --raised: #2e323c; --hover: #383d49; --line: #3b404d;
+    --text: #eef0f4; --soft: #c9cdd6; --muted: #9ba1af;
+    --accent: #ff66ab; --accent-ink: #2a0d1b; --accent-soft: rgba(255, 102, 171, 0.13);
+    --blue: #7fb2ff; --ok: #5fd39a; --warn: #f0c56a; --err: #ff8a8a;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body { font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+  button, input, select { font: inherit; color: inherit; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 30px 20px 64px; }
+  header { display: flex; align-items: baseline; gap: 14px; margin-bottom: 24px; flex-wrap: wrap; }
+  header h1 { font-size: 24px; margin: 0; letter-spacing: -0.02em; font-weight: 750; }
+  header h1 span { color: var(--accent); }
+  header p { margin: 0; color: var(--muted); }
+  .cols { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 22px; align-items: start; }
+  @media (max-width: 900px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 20px;
+           box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16); }
+  h2 { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 650; margin: 0 0 12px; letter-spacing: -0.01em; }
+  h2 .step { width: 22px; height: 22px; border-radius: 50%; background: var(--raised); color: var(--soft); font-size: 12px;
+             font-weight: 700; display: inline-grid; place-items: center; }
+  h2 .count { color: var(--muted); font-weight: 500; font-size: 14px; }
+  .panel h2 + .field { margin-top: 0; }
+  .rule { border: 0; border-top: 1px solid var(--line); margin: 20px 0 18px; }
+  .hint { color: var(--muted); font-size: 13px; }
+
+  /* drop zone */
+  .drop { border: 1.5px dashed #4d5362; border-radius: 14px; padding: 22px 14px; text-align: center; background: var(--well);
+          transition: border-color .15s, background .15s; cursor: pointer; }
+  .drop:hover { border-color: var(--muted); }
+  .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+  .drop svg { display: block; margin: 0 auto 8px; color: var(--soft); }
+  .drop strong { display: block; font-size: 16px; margin-bottom: 2px; }
+  .drop .bar { height: 6px; background: var(--raised); border-radius: 3px; margin-top: 12px; overflow: hidden; }
+  .drop .bar i { display: block; height: 100%; background: var(--accent); width: 0; }
+  .songs { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+  .song { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 12px; border-radius: 10px;
+          background: var(--raised); cursor: pointer; min-width: 0; box-shadow: inset 0 0 0 1px transparent; transition: background .12s; }
+  .song:hover { background: var(--hover); }
+  .song.on { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+  .song .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .song .name small { color: var(--muted); font-weight: 400; font-size: 13px; }
+  .x { background: none; border: 0; color: var(--muted); cursor: pointer; width: 28px; height: 28px; border-radius: 8px;
+       font-size: 14px; line-height: 1; flex: none; }
+  .x:hover { color: var(--err); background: rgba(255, 138, 138, 0.12); }
+
+  /* form */
+  .field { margin-top: 16px; }
+  .field > label, .label { display: flex; justify-content: space-between; align-items: baseline; font-weight: 600; font-size: 14px;
+                           color: var(--soft); margin-bottom: 7px; }
+  .field > label b, .label b { color: var(--accent); font-variant-numeric: tabular-nums; font-size: 15px; }
+  input[type=text], input[type=number], select {
+    width: 100%; background: var(--well); border: 1px solid var(--line); border-radius: 10px; padding: 8px 11px; outline: none;
+    transition: border-color .12s; }
+  input[type=text]:hover, input[type=number]:hover, select:hover { border-color: #4d5362; }
+  input::placeholder { color: #747a89; }
+  input:focus-visible, select:focus-visible, button:focus-visible, .drop:focus-visible, summary:focus-visible, a:focus-visible {
+    outline: 2px solid var(--blue); outline-offset: 2px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); margin: 2px 0; }
+  input[type=file] { color: var(--muted); font-size: 13px; }
+  input[type=file]::file-selector-button { font: inherit; font-weight: 600; color: var(--text); background: var(--raised);
+    border: 1px solid var(--line); border-radius: 8px; padding: 5px 12px; margin-right: 10px; cursor: pointer; }
+  input[type=file]::file-selector-button:hover { background: var(--hover); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; background: var(--well); border: 1px solid var(--line);
+         border-radius: 12px; padding: 4px; }
+  .seg button { background: none; border: 0; border-radius: 8px; padding: 6px; cursor: pointer; color: var(--soft); font-weight: 600; }
+  .seg button:hover { background: var(--raised); }
+  .seg button.on { background: var(--accent-soft); color: #fff; box-shadow: inset 0 0 0 1px var(--accent); }
+  .styles { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
+  .styles button { background: var(--raised); border: 0; border-radius: 10px; padding: 8px 12px; cursor: pointer; text-align: left;
+                   font-weight: 600; color: var(--soft); box-shadow: inset 0 0 0 1px transparent; transition: background .12s; }
+  .styles button:hover { background: var(--hover); }
+  .styles button.on { background: var(--accent-soft); color: #fff; box-shadow: inset 0 0 0 1px var(--accent); }
+  .styles button { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 6px; min-width: 0; }
+  .styles .fit { font-size: 11.5px; font-weight: 500; color: var(--warn); white-space: nowrap; }
+  .styles .fit:empty { display: none; }
+  .styles .fit.good { color: var(--ok); }
+  .tempo { margin: 8px 2px 0; line-height: 1.45; }
+  .tempo b { color: var(--soft); font-weight: 600; }
+  .blurb { margin: 8px 0 0; padding: 9px 12px; background: var(--well); border-radius: 10px; color: var(--soft); font-size: 13.5px;
+           min-height: 58px; }
+  details { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 12px; }
+  summary { cursor: pointer; color: var(--soft); font-weight: 600; font-size: 14px; list-style: none; display: flex; align-items: center; gap: 8px; border-radius: 6px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: ""; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
+                    transform: rotate(-45deg); transition: transform .15s; margin-left: 2px; }
+  details[open] summary::before { transform: rotate(45deg); }
+  details.info { margin-top: 6px; border-top: 0; padding-top: 0; }
+  details.info summary { font-size: 13px; font-weight: 500; color: var(--muted); }
+  .info-body { margin-top: 8px; padding: 10px 13px; background: var(--well); border-radius: 10px; font-size: 13px;
+               color: var(--soft); line-height: 1.5; }
+  .info-body h3 { font-size: 13px; font-weight: 650; color: var(--text); margin: 10px 0 4px; }
+  .info-body h3:first-child { margin-top: 0; }
+  .info-body p { margin: 0 0 6px; }
+  .info-body ul { margin: 0 0 6px; padding-left: 18px; }
+  .info-body li + li { margin-top: 3px; }
+  .info-body b { color: var(--text); font-weight: 600; }
+  .inline { display: flex; gap: 6px; }
+  .check { display: flex; gap: 8px; align-items: center; margin-top: 16px; color: var(--muted); font-size: 14px; cursor: pointer; }
+  .check input { accent-color: var(--accent); width: 15px; height: 15px; }
+  .go { width: 100%; margin-top: 14px; padding: 12px; border: 0; border-radius: 12px; background: var(--accent); color: var(--accent-ink);
+        font-weight: 700; font-size: 15.5px; cursor: pointer; transition: filter .12s, transform .05s; }
+  .go:hover { filter: brightness(1.07); }
+  .go:active { transform: translateY(1px); }
+  .go:disabled { background: var(--raised); color: var(--muted); cursor: default; filter: none; transform: none; }
+  .link { background: none; border: 0; color: var(--blue); cursor: pointer; padding: 0; font-size: 13px; }
+  .link:hover { text-decoration: underline; }
+
+  /* maps */
+  .maps { display: flex; flex-direction: column; gap: 14px; }
+  .empty { color: var(--muted); padding: 44px 16px; text-align: center; border: 1.5px dashed var(--line); border-radius: 18px; }
+  .map { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 18px 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12); }
+  .map .top { display: flex; gap: 12px; align-items: flex-start; }
+  .map .title { flex: 1; min-width: 0; }
+  .map .title b { display: block; font-size: 17px; font-weight: 650; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .map .title > span { color: var(--muted); font-size: 13.5px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 9px; }
+  .chip { background: var(--raised); border-radius: 999px; padding: 2px 10px; font-size: 12.5px; color: var(--soft); white-space: nowrap; }
+  .chip.style { background: var(--accent-soft); color: #ffb3d4; }
+  .stars { font-size: 25px; font-weight: 750; color: var(--accent); font-variant-numeric: tabular-nums; line-height: 1.05; white-space: nowrap; text-align: right; }
+  .stars small { display: block; font-size: 11.5px; color: var(--muted); font-weight: 500; margin-top: 3px; }
+  .prog { height: 8px; background: var(--well); border-radius: 4px; overflow: hidden; margin: 14px 0 6px; }
+  .prog i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), #ff9bc8); width: 0; transition: width .5s; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; margin-top: 14px; }
+  .fact { background: var(--well); border-radius: 10px; padding: 8px 12px; }
+  .fact b { display: block; font-variant-numeric: tabular-nums; font-weight: 650; }
+  .fact span { color: var(--muted); font-size: 12.5px; }
+  .spark { width: 100%; height: 42px; display: block; margin-top: 10px; border-radius: 10px; background: var(--well); }
+  .why { margin: 12px 0 0; padding: 8px 12px; border-left: 3px solid var(--accent); background: var(--well);
+         border-radius: 0 10px 10px 0; color: var(--soft); font-size: 13.5px; }
+  .notes { margin: 12px 0 0; padding: 9px 14px; list-style: none; background: rgba(240, 197, 106, 0.07);
+           border: 1px solid rgba(240, 197, 106, 0.22); border-radius: 12px; }
+  .notes li { color: #ead9ae; font-size: 13.5px; padding-left: 24px; position: relative; }
+  .notes li + li { margin-top: 6px; }
+  .notes li::before { content: "!"; position: absolute; left: 0; top: 2px; width: 16px; height: 16px; border-radius: 50%;
+                      background: var(--warn); color: #3a2c08; font-weight: 800; font-size: 11px; line-height: 16px; text-align: center; }
+  .error { color: var(--err); margin-top: 12px; }
+  .acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .btn { background: var(--raised); border: 1px solid var(--line); border-radius: 10px; padding: 7px 14px; cursor: pointer; text-decoration: none;
+         color: var(--text); display: inline-block; font-weight: 600; font-size: 14px; transition: background .12s, border-color .12s; }
+  .btn:hover { background: var(--hover); border-color: #4d5362; }
+  .btn.main { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .btn.main:hover { filter: brightness(1.07); background: var(--accent); border-color: var(--accent); }
+  .foot { margin-top: 16px; }
+
+  /* preview */
+  .veil { position: fixed; inset: 0; background: rgba(16, 17, 21, 0.74); backdrop-filter: blur(5px); display: none; align-items: center;
+          justify-content: center; padding: 14px; z-index: 10; }
+  .veil.on { display: flex; }
+  .stage { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 16px; width: min(560px, 100%); max-height: 100%;
+           display: flex; flex-direction: column; gap: 12px; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45); }
+  .stage .top { display: flex; align-items: center; gap: 10px; }
+  .stage .top b { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+  #field { width: 100%; height: min(58vh, 560px); background: #15171c; border-radius: 12px; display: block; }
+  .seek { position: relative; height: 40px; }
+  .seek canvas { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 10px; background: var(--well); }
+  .seek input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  .ctl { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .ctl .time { font-variant-numeric: tabular-nums; color: var(--soft); min-width: 92px; }
+  .ctl label { color: var(--muted); font-size: 13px; display: flex; gap: 6px; align-items: center; }
+  .ctl select { width: auto; padding: 5px 8px; }
+  .ctl input[type=range] { width: 110px; }
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--raised); border: 1px solid #4d5362;
+           padding: 10px 18px; border-radius: 999px; display: none; z-index: 20; max-width: 90vw; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35); }
+  .toast.on { display: block; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>map<span>maker</span></h1>
+    <p>Drop a song, get an osu!mania chart at the star rating you ask for.</p>
+  </header>
+
+  <div class="cols">
+    <section class="panel" aria-label="Make a map">
+      <h2><span class="step">1</span>Song</h2>
+      <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose a song file">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+        <strong id="dropTitle">Drop a song here</strong>
+        <span class="hint" id="dropHint">or click to choose · mp3, ogg, opus, m4a, wav, flac</span>
+        <div class="bar" id="upBar" hidden><i></i></div>
+        <input type="file" id="pick" accept="audio/*,.mp3,.ogg,.opus,.m4a,.aac,.wav,.flac,.aiff" multiple hidden>
+      </div>
+      <div class="songs" id="songs"></div>
+      <div class="two" id="tags" hidden>
+        <div class="field"><label for="title">Title</label><input type="text" id="title" maxlength="80"></div>
+        <div class="field"><label for="artist">Artist</label><input type="text" id="artist" maxlength="80" placeholder="Unknown Artist"></div>
+      </div>
+
+      <hr class="rule">
+      <h2><span class="step">2</span>Chart</h2>
+      <div class="field">
+        <label for="stars">Star rating <b id="starsOut">4.5★</b></label>
+        <input type="range" id="stars" min="1" max="7" step="0.1" value="4.5">
+        <details class="info" id="starInfo"><summary>What the star rating changes</summary><div class="info-body" id="starText"></div></details>
+      </div>
+      <div class="field">
+        <div class="label">Keys</div>
+        <div class="seg" id="keys"></div>
+      </div>
+      <div class="field">
+        <div class="label">Style</div>
+        <div class="styles" id="styles"></div>
+        <p class="blurb" id="styleNote"></p>
+        <p class="hint tempo" id="tempoNote"></p>
+      </div>
+      <div class="field">
+        <label for="ln">Long notes <b id="lnOut"></b></label>
+        <input type="range" id="ln" min="0" max="100" step="5" value="50">
+        <div class="hint"><span id="lnHint">Share of the held sung notes that become LNs.</span>
+          <button class="link" id="lnReset" type="button" hidden>Back to the style's own</button></div>
+      </div>
+
+      <details id="more">
+        <summary>More options</summary>
+        <div class="two">
+          <div class="field"><label for="creator">Creator</label><input type="text" id="creator" maxlength="40"></div>
+          <div class="field"><label for="version">Difficulty name</label><input type="text" id="version" maxlength="60" placeholder="4K Coordination"></div>
+        </div>
+        <div class="two">
+          <div class="field"><label for="seed">Pattern variation</label>
+            <div class="inline"><input type="number" id="seed" min="0" value="2016"><button class="btn" id="dice" type="button" title="Another variation">Shuffle</button></div></div>
+          <div class="field"><label for="tempo">Tempo</label>
+            <select id="tempo"><option value="auto">As detected</option><option value="half">Half</option><option value="double">Double</option></select></div>
+        </div>
+        <div class="two">
+          <div class="field"><label for="bpm">BPM</label><input type="number" id="bpm" step="0.001" min="30" max="400" placeholder="auto"></div>
+          <div class="field"><label for="offset">Offset (ms)</label><input type="number" id="offset" step="1" min="0" placeholder="auto"></div>
+        </div>
+        <div class="two">
+          <div class="field"><label for="nudge">Nudge all notes (ms)</label><input type="number" id="nudge" step="1" value="0"></div>
+          <div class="field"><label for="od">OD / HP</label>
+            <div class="inline"><input type="number" id="od" min="0" max="10" step="0.5" value="8"><input type="number" id="hp" min="0" max="10" step="0.5" value="8"></div></div>
+        </div>
+        <div class="field"><label for="bg">Background image</label>
+          <input type="file" id="bg" accept=".jpg,.jpeg,.png,image/jpeg,image/png">
+          <div class="hint" id="bgHint">Optional. Saved with the selected song.</div></div>
+        <div class="hint" style="margin-top:10px">Leave BPM and offset empty to have them measured. Give both to use them as they are.</div>
+      </details>
+
+      <label class="check"><input type="checkbox" id="auto" checked> Start as soon as a song is dropped</label>
+      <button class="go" id="go" disabled>Make map</button>
+    </section>
+
+    <section aria-label="Your maps">
+      <h2>Your maps <span class="count" id="count"></span></h2>
+      <div class="maps" id="maps"><div class="empty">Nothing yet. Drop a song on the left.</div></div>
+      <p class="hint foot">Everything runs on this computer. A new song takes about half a minute the
+        first time; other keys, styles and ratings for the same song take a few seconds.</p>
+    </section>
+  </div>
+</div>
+
+<div class="veil" id="veil" role="dialog" aria-modal="true" aria-label="Chart preview">
+  <div class="stage">
+    <div class="top"><b id="pvTitle"></b><button class="x" id="pvClose" aria-label="Close preview">✕</button></div>
+    <canvas id="field"></canvas>
+    <div class="seek"><canvas id="strip"></canvas><input type="range" id="pos" min="0" max="1000" value="0" aria-label="Position"></div>
+    <div class="ctl">
+      <button class="btn main" id="play">Play</button>
+      <span class="time" id="clock">0:00 / 0:00</span>
+      <label>Speed <select id="rate"><option value="1">100%</option><option value="0.75">75%</option><option value="0.5">50%</option></select></label>
+      <label>Scroll <input type="range" id="scroll" min="20" max="120" value="55"></label>
+    </div>
+    <audio id="audio" preload="auto"></audio>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) el.setAttribute(k, v === true ? "" : v);
+  }
+  for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid.nodeType ? kid : document.createTextNode(kid));
+  return el;
+}
+function add(el, ...kids) { el.append(...kids.flat().filter(k => k != null && k !== false)); return el; }
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Something went wrong.");
+  return data;
+}
+let toastTimer;
+function toast(text) {
+  $("toast").textContent = text; $("toast").classList.add("on");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => $("toast").classList.remove("on"), 4200);
+}
+
+// ------------------------------------------------------------------ settings
+const saved = JSON.parse(localStorage.getItem("mapmaker") || "{}");
+if (!saved.v && saved.style === "tech") saved.style = "coordination";   // that style was renamed
+const form = { keys: saved.keys || 4, style: saved.style || "coordination", ln: saved.ln ?? null };
+let app = { styles: [], keys: [], songs: [], jobs: [] };
+let current = null;               // id of the selected song
+
+function remember() {
+  localStorage.setItem("mapmaker", JSON.stringify({
+    v: 2, keys: form.keys, style: form.style, ln: form.ln, stars: $("stars").value, creator: $("creator").value,
+    auto: $("auto").checked, od: $("od").value, hp: $("hp").value, scroll: $("scroll").value }));
+}
+function styleOf(id) { return app.styles.find(s => s.id === id) || { ln: 0, label: id }; }
+function showLn() {
+  const auto = styleOf(form.style).auto;
+  $("ln").disabled = !!auto;
+  if (auto) {
+    form.ln = null; $("lnOut").textContent = "style's own"; $("lnReset").hidden = true;
+    $("lnHint").textContent = "Each style's own mix of long notes. Choose a style to set it yourself.";
+    return;
+  }
+  const own = Math.round(styleOf(form.style).ln * 100);
+  const value = form.ln == null ? own : Math.round(form.ln * 100);
+  $("ln").value = value;
+  $("lnOut").textContent = value + "%" + (form.ln == null ? " (style's own)" : "");
+  $("lnReset").hidden = form.ln == null;
+  $("lnHint").textContent = styleOf(form.style).short ? "Share of all notes that are held as short LNs."
+    : styleOf(form.style).weave ? "0% has no LNs; 50% is the style's own mix of holds, shields and all-LN phrases; towards 100% every phrase is written in LNs only."
+    : "Share of the held sung notes that become LNs.";
+}
+function drawChoices() {
+  $("keys").replaceChildren(...app.keys.map(k => h("button", { type: "button", class: k === form.keys ? "on" : "",
+    "aria-pressed": k === form.keys, onclick: () => { form.keys = k; drawChoices(); remember(); wantRec(); } }, k + "K")));
+  $("styles").replaceChildren(...app.styles.map(s => h("button", { type: "button", class: s.id === form.style ? "on" : "",
+    "aria-pressed": s.id === form.style, title: s.blurb, "data-style": s.id,
+    onclick: () => { form.style = s.id; form.ln = null; drawChoices(); remember(); } }, s.label, h("span", { class: "fit" }))));
+  $("styleNote").textContent = styleOf(form.style).blurb || "";
+  showLn();
+  drawTempo();
+}
+
+// ------------------------------------------------- which style suits the selected song
+// Known once the song has been mapped once (it has been listened to then), for the
+// rating, keys and tempo set here. "Recommended" makes the map in the first of these.
+const recs = new Map();             // "song|stars|keys|tempo" -> {why, styles: [{style, score, why}]}
+let recTimer, recAsking = null;
+function recKey() { return current ? [current, (+$("stars").value).toFixed(1), form.keys, $("tempo").value].join("|") : null; }
+function recNow() { return recs.get(recKey()) || null; }
+function wantRec() {
+  clearTimeout(recTimer);
+  const key = recKey();
+  if (!key || recs.has(key) || recAsking === key) return drawTempo();
+  recTimer = setTimeout(async () => {
+    const [song, stars, keys, tempo] = key.split("|");
+    recAsking = key;
+    try { const r = await api(`/api/songs/${song}/styles?stars=${stars}&keys=${keys}&tempo=${tempo}`); if (r.ready) recs.set(key, r); }
+    catch (err) { /* asked again on the next change */ }
+    if (recAsking === key) recAsking = null;
+    drawTempo();
+  }, 150);
+}
+
+// ------------------------------------------------------- which tempos suit a style
+// A style is written for rows a certain time apart, and for some styles that depends on
+// the rating (fast jacks are for high ratings). These say which songs suit it, and
+// whether the selected song does, read at the tempo the app found for it.
+function suitsAt(st, stars) {
+  if (!st.suits) return null;
+  return st.suits[Math.min(10, Math.max(1, Math.round(stars * 10) / 10)).toFixed(1)] || null;
+}
+function gridsOf(st, beat, stars) {            // lines a beat a style charts a song on, best first (chart.grids_for)
+  if (!st.rows) return [4];
+  const own = [4, 8], r = suitsAt(st, stars);
+  if (st.quick && r) {                         // by the rating: the song's 1/4, or triplets where those are too fast
+    const [low, high, lines] = r, middle = Math.sqrt(low * high), quarter = lines * beat / 4;
+    const extra = (quarter < low ? [3] : []).concat(quarter > 1.25 * high ? [6] : []);
+    const off = t => { const ms = lines * beat / t;
+      return [Math.max(0, Math.log(low / ms), Math.log(ms / high)) + (own.includes(t) ? 0 : 0.04), Math.abs(Math.log(ms / middle))]; };
+    return own.concat(extra).sort((a, b) => { const x = off(a), y = off(b); return (x[0] - y[0]) || (x[1] - y[1]); });
+  }
+  const [want, n] = st.rows, miss = t => Math.abs(Math.log(n * beat / t / want));
+  return own.sort((a, b) => miss(a) - miss(b));
+}
+function tempoSpans(st, stars) {                // [[from BPM, to BPM], ...] of the songs it suits, the main one last
+  const r = suitsAt(st, stars); if (!r) return [];
+  const [lo, hi, lines] = r;
+  const span = tpb => [Math.round(60000 * lines / (hi * tpb)), Math.round(60000 * lines / (lo * tpb))];
+  if (st.quick) { const a = span(4), b = span(3); return [span(8), [a[0], b[1]]]; }   // 1/4 notes, then triplets
+  return (st.rows ? [span(8), span(4)] : [span(4)]).filter(([a, b]) => b >= 60 && a <= 400);
+}
+function songTempo(id) {                       // from the newest map of it made at the tempo found
+  const job = app.jobs.find(j => j.song === id && j.status === "done" && j.stats && j.stats.bpm
+    && (j.options || {}).bpm == null && ((j.options || {}).tempo || "auto") === "auto");
+  return job ? { bpm: job.stats.bpm, range: job.stats.tempo } : null;
+}
+function fitOf(st, bpm, stars) {               // "fits", "too fast" or "too slow" at the tempo the song is mostly in
+  if (!bpm) return null;
+  const r = suitsAt(st, stars); if (!r) return "fits";
+  const [lo, hi, lines] = r, beat = 60000 / bpm;
+  const spacing = lines * beat / gridsOf(st, beat, stars)[0];   // styles built for a row spacing pick their grid
+  const give = st.quick ? 0.05 : 0;            // its grid was picked for the rating: only well off counts
+  return spacing < lo * (1 - give) ? "too fast" : spacing > hi * (1 + give) ? "too slow" : "fits";
+}
+function drawTempo() {
+  drawStarInfo();
+  const stars = +$("stars").value, st = styleOf(form.style), tempo = current && songTempo(current), bpm = tempo && tempo.bpm;
+  const rec = recNow(), best = rec && rec.styles[0].style;
+  for (const b of $("styles").querySelectorAll("button")) {
+    const id = b.dataset.style, mark = b.querySelector(".fit");
+    const fit = bpm ? fitOf(styleOf(id), bpm, stars) : null;
+    mark.textContent = styleOf(id).auto ? (best ? styleOf(best).label : "")
+      : id === best ? "best fit" : fit && fit !== "fits" ? fit : "";
+    mark.classList.toggle("good", !!best && (id === best || !!styleOf(id).auto));
+  }
+  $("version").placeholder = form.keys + "K " + (st.auto ? (best ? styleOf(best).label : "(the style picked)") : st.label);
+  if (st.auto) {
+    const at = (+stars).toFixed(1) + "★";
+    $("tempoNote").replaceChildren(...(!current ? ["Drop a song: once it has been listened to, the style that suits it is picked."]
+      : !rec ? ["The style is picked once the song has been listened to; the map says which one and why."]
+      : (() => { const label = styleOf(best).label, i = rec.why.indexOf(label);
+                 return [`At ${at}: ` + rec.why.slice(0, i), h("b", {}, label), rec.why.slice(i + label.length)]; })()));
+    return;
+  }
+  const spans = tempoSpans(st, stars);
+  const at = (+stars).toFixed(1) + "★";
+  const main = spans[spans.length - 1];       // read on 1/4 lines; a style that picks its grid also takes half that
+  const r = suitsAt(st, stars), upTo = r && Math.round(60000 * r[2] / (r[0] * 4));
+  const parts = [main
+    ? [`At ${at} ${st.label} suits songs of about `, h("b", {}, main[0] + "–" + main[1] + " BPM"),
+       st.quick && upTo < main[1] ? `: on their 1/4 notes up to ${upTo} BPM, in triplets above` : "",
+       spans.length > 1 ? " (or half that)." : "."]
+    : [`${st.label} suits songs of any tempo.`]];
+  if (bpm) {
+    const fit = fitOf(st, bpm, stars), good = app.styles.filter(s => fitOf(s, bpm, stars) === "fits" && suitsAt(s, stars)).map(s => s.label);
+    parts.push([" This song: ", h("b", {}, tempo.range ? `${tempo.range.low}–${tempo.range.high} BPM, mostly ${+bpm.toFixed(1)}`
+                                                       : `${+bpm.toFixed(1)} BPM`)]);
+    if (fit && fit !== "fits")
+      parts.push([`, ${fit} for ${st.label} at this rating` + (good.length ? `; at ${at} it suits ${good.join(", ")}.` : ".")]);
+    else parts.push([", a good fit."]);
+  }
+  if (best && best !== form.style) parts.push([" Best fit for this song: ", h("b", {}, styleOf(best).label), "."]);
+  $("tempoNote").replaceChildren(...parts.flat());
+}
+// ---------------------------------------------- what the star rating changes
+// osu!'s difficulty names by rating, and what ranked 4K maps there average in notes a
+// second (the reference sets in research/, see research/notes/star_rating_reference.md)
+const BANDS = [[2.0, "Easy", "2–5"], [2.7, "Normal", "6–9"], [4.0, "Hard", "8–14"], [5.3, "Insane", "12–19"],
+               [6.5, "Expert", "13–23"], [99, "Expert+", "14–25"]];
+function rich(text) {                          // "**x**" in a line of text -> x in bold
+  return text.split("**").map((part, i) => i % 2 ? h("b", null, part) : part);
+}
+function along(s, a, x, b, y) { return x + (y - x) * Math.min(1, Math.max(0, (s - a) / (b - a))); }
+function share(x) { const n = Math.round(1 / Math.max(x, 1e-9)); return x < 0.005 ? "none" : n <= 20 ? `about 1 in ${n}` : "very few"; }
+// what goes up with the rating in each style (chart.STYLES), for a rating of s
+const RATED = {
+  coordination: s => {
+    const inv = along(s, 3.5, 0, 5.5, 0.25), only = along(s, 4.5, 0.1, 5.5, 0.4);
+    return ["Something is held most of the time, a beat or two at a stretch, each hold in a column of the other hand than the last, " +
+              "while the other fingers play the rhythm. The rating sets how much of the rhythm is played around the holds.",
+            "Holds get a **reverse shield** (a tap just after letting go) about half the time, and a **shield** (a tap just before) rarely, never as a jump.",
+            `Four-bar phrases written as **inverse** (everything held, the gaps are what you play): ${share(inv)} at ${s.toFixed(1)}★; ` +
+              `in long notes only: ${share(Math.max(only - inv, 0.65 * only))}. Both grow toward 5.5★.`,
+            "A column is hit twice in a row on 1/4 notes only where the rating can't be reached without it, and never two columns at once."];
+  },
+  stream: s => {
+    const r = suitsAt(styleOf("stream"), s), from = Math.round(15000 / r[1]);
+    return ["Rows stay on the song's **1/4 notes** (its 1/8 notes for songs under about 106 BPM): they never get faster to reach a rating.",
+            "The rating comes from chords: single notes and **light jumpstream** low down, then **jumpstream**, then **handstream**, " +
+              "**quads** from 5★" + (s >= 5 ? " (so at this rating)" : "") + ".",
+            "Each beat is laid out as in ranked streams: mostly a jump or hand on the beat and a **staircase** of single notes after it, " +
+              "now and then a jump moved off the beat or a short **jumptrill**, so the patterns keep changing.",
+            "**No column is hit on two rows running** (except next to a quad), as in ranked streams. That is why a stream's rating depends on the song's speed: " +
+              `at ${s.toFixed(1)}★ it takes a song of about **${from} BPM** or faster; on a slower song the map stops short of the rating and says so.`];
+  },
+  speed: s => ["Single notes about **57 ms apart** (the song's 1/4 or 1/8 notes, whichever is closer), the hands taking turns, in Palette GAMMA's patterns.",
+               "The rating sets how long and how many the runs are: long runs where the song is loud, a plain beat elsewhere, a few jumps on the accents."],
+  tech: s => ["1/4 notes with short bursts in 1/8, 1/6 and finer leading into rows: the song's own fast hits where it has them, invented where it doesn't.",
+              "The rating sets how full the 1/4 lines are, how many rows get a burst (up to about half) and how many jumps there are. " +
+              "On a song whose 1/4 notes can't reach the rating, it charts 1/8 notes and its bursts get faster with them."],
+  speedjack: s => {
+    const st = styleOf("speedjack"), r = suitsAt(st, s), most = s >= 6 ? 6 : s >= 5.5 ? 5 : s >= 4.25 ? 4 : 3;
+    return [`At ${s.toFixed(1)}★ its rows come **${Math.round(r[0])}–${Math.round(r[1])} ms apart**: on the song's 1/4 notes where those are about that fast, ` +
+              "and in **triplets** (1/3 of a beat) where the song's 1/4 notes would be faster. Faster jacks only come with a higher rating " +
+              `(${suitsAt(st, 4.5).slice(0, 2).map(Math.round).join("–")} ms at 4.5★, ${suitsAt(st, 5.5).slice(0, 2).map(Math.round).join("–")} at 5.5★).`,
+            `A column is hit again on the very next row a couple of times a bar, at most **${most} times in a row** at this rating.`,
+            "Jumps on most rows, and **hands** to make up the rating where the rows are slower."];
+  },
+  chordjack: s => ["Chords about **130 ms apart** (the song's 1/4 or 1/2 notes, whichever is closer) whose columns repeat from row to row. " +
+                   "The rating sets how big the chords are (jumps, then hands, then quads) and how many rows there are."],
+  ln: s => ["Sung notes are held for as long as they sound, and over half of the other notes become short holds (a quarter, half or whole beat), " +
+            "often two held at once. The rating sets how many notes there are; on a song whose 1/4 notes can't reach it, it charts 1/8 notes."],
+};
+function drawStarInfo() {
+  if (!$("starInfo").open) return;
+  const stars = +$("stars").value, st = styleOf(form.style), band = BANDS.find(b => stars < b[0]);
+  const rec = recNow(), id = st.auto ? (rec && rec.styles[0].style) : form.style;
+  const ul = items => h("ul", null, items.map(t => h("li", null, rich(t))));
+  $("starText").replaceChildren(
+    h("p", null, rich(`**${stars.toFixed(1)}★ is ${band[1]}** in osu!'s naming. Ranked 4K maps there average about ${band[2]} notes a second, ` +
+                      "and most of a ranked map plays at about 0.8 of its rating. Each map's card here shows the same for it.")),
+    h("h3", null, "How osu! works it out"),
+    h("p", null, rich("From the notes alone: how close together they come, in each column and across the keys, with notes played while a " +
+                      "long note is held counting a little more. The **hardest ten seconds or so** make up nearly all of the number, so a map that keeps " +
+                      "its hardest density up all song plays much more tiring than one that peaks in a few bursts. It can't see patterns: a jack " +
+                      "and a stream of the same density rate the same. This app rates its maps the way osu!lazer does, to two decimals.")),
+    h("h3", null, "What the app changes to reach it"),
+    ul(["**How many sounds get a note**: the strongest drum hits and sung notes first, then every beat and half beat, then 1/4 runs between them.",
+        "**Where**: the loud parts first. Verses get about 60% as much, quiet parts follow the melody, and quieter choruses up to 30% less than " +
+          "the loudest, so the rating is reached where the song peaks and the rest plays easier.",
+        "**Chord size**: single notes, then jumps on the drum accents, then hands.",
+        "**Patterns**: comfortable ones first. Harsher ones (longer jacks, one hand playing many notes in a row) only where nothing gentler reaches the rating."]),
+    h("h3", null, id && RATED[id] ? `In ${styleOf(id).label}${st.auto ? " (the style picked for this song)" : ""}` : "In the style picked"),
+    id && RATED[id] ? ul(RATED[id](stars)) : h("p", null, "Recommended picks a style for the song once it has been listened to; this then says what the rating changes in it."));
+}
+$("starInfo").addEventListener("toggle", drawStarInfo);
+$("stars").addEventListener("input", () => { $("starsOut").textContent = (+$("stars").value).toFixed(1) + "★"; drawTempo(); remember(); wantRec(); });
+$("tempo").addEventListener("change", wantRec);
+$("ln").addEventListener("input", () => { form.ln = $("ln").value / 100; showLn(); remember(); });
+$("lnReset").addEventListener("click", () => { form.ln = null; showLn(); remember(); });
+$("dice").addEventListener("click", () => { $("seed").value = Math.floor(Math.random() * 100000); });
+for (const id of ["creator", "auto", "od", "hp"]) $(id).addEventListener("change", remember);
+
+function options() {
+  const num = id => $(id).value === "" ? null : +$(id).value;
+  return { stars: +$("stars").value, keys: form.keys, style: form.style, ln: form.ln, seed: num("seed") ?? 2016,
+           creator: $("creator").value, title: $("title").value, artist: $("artist").value, version: $("version").value,
+           bpm: num("bpm"), offset: num("offset"), tempo: $("tempo").value, nudge: num("nudge") ?? 0,
+           od: num("od") ?? 8, hp: num("hp") ?? 8 };
+}
+
+// --------------------------------------------------------------------- songs
+function select(id) {
+  current = id;
+  const song = app.songs.find(s => s.id === id);
+  $("tags").hidden = !song; $("go").disabled = !song;
+  if (song) { $("title").value = song.title || ""; $("artist").value = song.artist || ""; }
+  $("bgHint").textContent = song && song.bg ? "This song has a background image." : "Optional. Saved with the selected song.";
+  drawSongs();
+  drawTempo();
+  wantRec();
+}
+function drawSongs() {
+  $("songs").replaceChildren(...app.songs.slice(0, 8).map(s => h("div", { class: "song" + (s.id === current ? " on" : ""),
+      onclick: () => select(s.id) },
+    h("div", { class: "name", title: s.file }, s.title || s.file, s.artist ? h("small", null, "  " + s.artist) : null),
+    h("button", { class: "x", title: "Remove this song and its maps", "aria-label": "Remove song",
+      onclick: async ev => { ev.stopPropagation();
+        if (!confirm("Remove this song and every map made from it?")) return;
+        const r = await api("/api/songs/" + s.id, { method: "DELETE" });
+        if (!r.removed) toast("Can't remove it while a map is being made.");
+        if (current === s.id) current = null; refresh(); } }, "✕"))));
+}
+function upload(file) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/songs?name=" + encodeURIComponent(file.name));
+    xhr.upload.onprogress = ev => { if (ev.lengthComputable) $("upBar").firstElementChild.style.width = (100 * ev.loaded / ev.total) + "%"; };
+    xhr.onload = () => { let data = {}; try { data = JSON.parse(xhr.responseText); } catch (e) {}
+      xhr.status === 200 ? resolve(data) : reject(new Error(data.error || "Upload failed.")); };
+    xhr.onerror = () => reject(new Error("Upload failed - is mapmaker still running?"));
+    xhr.send(file);
+  });
+}
+async function take(files) {
+  const list = [...files].filter(f => f.size > 0);
+  if (!list.length) return;
+  $("upBar").hidden = false;
+  for (const [i, file] of list.entries()) {
+    $("dropTitle").textContent = "Uploading " + file.name + (list.length > 1 ? ` (${i + 1} of ${list.length})` : "");
+    $("upBar").firstElementChild.style.width = "0";
+    try {
+      const song = await upload(file);
+      await refresh(); select(song.id);
+      if ($("auto").checked) await start();
+    } catch (err) { toast(err.message); }
+  }
+  $("upBar").hidden = true; $("dropTitle").textContent = "Drop a song here";
+}
+const drop = $("drop");
+drop.addEventListener("click", () => $("pick").click());
+drop.addEventListener("keydown", ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); $("pick").click(); } });
+$("pick").addEventListener("change", ev => { take(ev.target.files); ev.target.value = ""; });
+for (const type of ["dragenter", "dragover"]) window.addEventListener(type, ev => { ev.preventDefault(); drop.classList.add("over"); });
+for (const type of ["dragleave", "drop"]) window.addEventListener(type, ev => { ev.preventDefault();
+  if (type === "drop" || ev.relatedTarget === null) drop.classList.remove("over"); });
+window.addEventListener("drop", ev => take(ev.dataTransfer.files));
+$("bg").addEventListener("change", async ev => {
+  const file = ev.target.files[0];
+  if (!file || !current) { if (file) toast("Pick a song first."); return; }
+  try { await api(`/api/songs/${current}/bg?name=${encodeURIComponent(file.name)}`, { method: "POST", body: file });
+        toast("Background saved for this song."); await refresh(); select(current); } catch (err) { toast(err.message); }
+});
+
+async function start() {
+  if (!current) return;
+  try { await api("/api/jobs", { method: "POST", headers: { "Content-Type": "application/json" },
+                                 body: JSON.stringify({ song: current, options: options() }) });
+        remember(); await refresh(); } catch (err) { toast(err.message); }
+}
+$("go").addEventListener("click", start);
+
+// ---------------------------------------------------------------------- maps
+const charts = new Map();           // job id -> chart (fetched once)
+const cards = new Map();            // job id -> { el, sig }
+const SECTION = { calm: "#737a8c", verse: "#7fb2ff", chorus: "#ff66ab" };
+function clock(s) { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
+
+function density(chart) {           // notes per second, and the section each second is in
+  const n = Math.ceil(chart.length / 1000), per = new Array(n).fill(0), kind = new Array(n).fill("calm");
+  for (const [t] of chart.notes) per[Math.min(n - 1, Math.max(0, Math.floor(t / 1000)))]++;
+  for (const [a, b, k] of chart.sections) for (let s = Math.max(0, Math.floor(a / 1000)); s < Math.min(n, b / 1000); s++) kind[s] = k;
+  return { per, kind, top: Math.max(1, ...per) };
+}
+function drawStrip(canvas, chart, at) {
+  const dpr = window.devicePixelRatio || 1, w = canvas.clientWidth, hgt = canvas.clientHeight;
+  if (!w || !hgt) return;
+  canvas.width = w * dpr; canvas.height = hgt * dpr;
+  const g = canvas.getContext("2d"); g.scale(dpr, dpr);
+  const d = chart.dens || (chart.dens = density(chart)), bw = w / d.per.length;
+  for (let i = 0; i < d.per.length; i++) {
+    const bar = Math.max(1, (hgt - 4) * d.per[i] / d.top);
+    g.fillStyle = SECTION[d.kind[i]]; g.globalAlpha = at != null && i * 1000 > at ? 0.45 : 0.95;
+    g.fillRect(i * bw, hgt - bar, Math.max(1, bw - 0.5), bar);
+  }
+  g.globalAlpha = 1;
+  if (at != null) { g.fillStyle = "#fff"; g.fillRect(w * at / chart.length - 1, 0, 2, hgt); }
+}
+async function chartOf(job) {
+  if (!charts.has(job.id)) charts.set(job.id, api(`/api/jobs/${job.id}/chart`));
+  return charts.get(job.id);
+}
+function stageText(job) { return `${job.stage}… ${Math.round(job.progress * 100)}%`; }
+function fact(value, label, title) { return h("div", { class: "fact", title }, h("b", null, value), h("span", null, label)); }
+function playFacts(p) {                       // how the map plays (pipeline._play); maps made before 2026-10-16 have none
+  if (!p) return [];
+  const chords = p.chords.length > 3 && !p.chords[3] ? p.chords.slice(0, 3) : p.chords;   // quads only if any
+  const sizes = ["single", "jump", "hand", "quad"].slice(0, chords.length);
+  return [
+    fact(p.like.toFixed(2) + "× · " + p.near + "%", "plays like · near its rating",
+         "Most of the map plays like this share of its rating, and this much of it plays within 10% of the rating. " +
+         "Ranked 4K Insane maps: about 0.84× and 30%."),
+    fact(chords.join(" / ") + "%", sizes.join(" / "), "Rows by how many notes they have"),
+    fact(p.snap + " · " + p.spacing + " ms", "usual row spacing"),
+    fact(p.longest_jack ? p.longest_jack + " in a row" : "none", p.jack_ms ? `jacks · fastest ${p.jack_ms} ms` : "jacks",
+         p.jacks + "% of the notes repeat the column of the row before")];
+}
+
+function styleShown(job) {            // the style a map is in; "Recommended" until it has been picked
+  const o = job.options;
+  if (!styleOf(o.style).auto) return styleOf(o.style).label;
+  return job.status === "done" && job.stats ? styleOf(job.stats.style).label + " · recommended" : "Recommended";
+}
+function card(job) {
+  const o = job.options, title = (job.meta && job.meta.title) || o.title || job.file;
+  const artist = (job.meta && job.meta.artist) || o.artist || "";
+  const el = h("article", { class: "map" });
+  const top = h("div", { class: "top" },
+    h("div", { class: "title" }, h("b", { title }, title), h("span", null, artist),
+      h("div", { class: "chips" }, h("span", { class: "chip style" }, styleShown(job)), h("span", { class: "chip" }, o.keys + "K"),
+        h("span", { class: "chip" }, "asked " + (+o.stars).toFixed(1) + "★"),
+        job.status === "done" && job.meta.version !== o.keys + "K " + styleOf(job.stats.style || o.style).label
+          ? h("span", { class: "chip" }, job.meta.version) : null)),
+    job.status === "done" ? h("div", { class: "stars" }, job.stats.stars.toFixed(2) + "★", h("small", null, "in osu!")) : null,
+    job.status !== "running" ? h("button", { class: "x", title: "Remove this map", "aria-label": "Remove map",
+      onclick: async () => { await api("/api/jobs/" + job.id, { method: "DELETE" }); refresh(); } }, "✕") : null);
+  el.append(top);
+  if (job.status === "queued") el.append(h("div", { class: "hint", style: "margin-top:10px" }, "Waiting for the map before it…"));
+  if (job.status === "running") {
+    el.append(h("div", { class: "prog" }, h("i", { style: `width:${Math.round(job.progress * 100)}%` })),
+              h("div", { class: "hint", "data-stage": "1" }, stageText(job)));
+  }
+  if (job.status === "error") el.append(h("div", { class: "error" }, job.error));
+  if (job.status === "done") {
+    const s = job.stats, spark = h("canvas", { class: "spark", title: "Notes per second through the song (grey calm, blue verse, pink chorus)" });
+    add(el,
+      h("div", { class: "facts" },
+        s.tempo ? fact(s.tempo.low + "–" + s.tempo.high + " BPM", s.tempo.sections + " tempo sections")
+                : fact(s.bpm + " BPM", "offset " + s.offset + " ms"),
+        fact(s.objects.toLocaleString(), s.holds + " long notes"),
+        fact(s.nps.toFixed(1) + " / s", "peak " + s.nps_peak + " / s"),
+        fact(Math.round(s.real * 100) + "%", "on real sounds"),
+        fact(clock(s.length), s.grid + " grid" + ((s.finer || []).length ? " + " + s.finer.join(" ") : "")),
+        playFacts(s.play)),
+      spark,
+      s.picked ? h("p", { class: "why" }, s.picked.why) : null,
+      job.warnings.length ? h("ul", { class: "notes" }, job.warnings.map(w => h("li", null, w))) : null,
+      h("div", { class: "acts" },
+        h("a", { class: "btn main", href: `/api/jobs/${job.id}/osz`, download: job.osz }, "Download .osz"),
+        h("button", { class: "btn", onclick: async () => { try { await api(`/api/jobs/${job.id}/open`, { method: "POST" });
+          toast("Sent to osu! - it should import in a moment."); } catch (err) { toast(err.message); } } }, "Open in osu!"),
+        h("button", { class: "btn", onclick: () => preview(job) }, "Preview"),
+        h("button", { class: "btn", title: "Load this map's song and settings into the form", onclick: () => reuse(job) }, "Change settings")));
+    chartOf(job).then(chart => requestAnimationFrame(() => drawStrip(spark, chart))).catch(() => {});
+  }
+  return el;
+}
+function reuse(job) {
+  const o = job.options;
+  if (app.songs.some(s => s.id === job.song)) select(job.song);
+  $("stars").value = o.stars; $("starsOut").textContent = (+o.stars).toFixed(1) + "★";
+  form.keys = o.keys; form.style = o.style; form.ln = o.ln;
+  for (const id of ["creator", "title", "artist", "version", "seed", "tempo", "nudge", "od", "hp"]) $(id).value = o[id] ?? "";
+  $("bpm").value = o.bpm ?? ""; $("offset").value = o.offset ?? "";
+  drawChoices(); window.scrollTo({ top: 0, behavior: "smooth" });
+  toast("Settings loaded - change what you like and press Make map.");
+}
+function drawMaps() {
+  const box = $("maps");
+  $("count").textContent = app.jobs.length ? "· " + app.jobs.length : "";
+  if (!app.jobs.length) { cards.clear(); box.replaceChildren(h("div", { class: "empty" }, "Nothing yet. Drop a song on the left.")); return; }
+  const keep = new Set();
+  let before = null;
+  for (const job of app.jobs) {
+    keep.add(job.id);
+    const sig = job.status + "|" + (job.error || "") + "|" + (job.osz || "");
+    let entry = cards.get(job.id);
+    if (!entry || entry.sig !== sig) {
+      const el = card(job);
+      if (entry) entry.el.replaceWith(el);
+      entry = { el, sig }; cards.set(job.id, entry);
+    } else if (job.status === "running") {      // same card: just move the bar
+      entry.el.querySelector(".prog i").style.width = Math.round(job.progress * 100) + "%";
+      entry.el.querySelector("[data-stage]").textContent = stageText(job);
+    }
+    if (entry.el.parentNode !== box || entry.el.previousSibling !== before) box.insertBefore(entry.el, before ? before.nextSibling : box.firstChild);
+    before = entry.el;
+  }
+  for (const [id, entry] of cards) if (!keep.has(id)) { entry.el.remove(); cards.delete(id); }
+  for (const kid of [...box.children]) if (kid.classList.contains("empty")) kid.remove();
+}
+
+let pollTimer;
+async function refresh() {
+  clearTimeout(pollTimer);
+  try {
+    app = await api("/api/state");
+    if (app.styles.length && !app.styles.some(s => s.id === form.style)) form.style = app.styles[0].id;
+    if (!drawChoices.done) { drawChoices.done = true; if (!$("creator").value) $("creator").value = saved.creator || app.creator; drawChoices(); }
+    if (current && !app.songs.some(s => s.id === current)) select(null); else drawSongs();
+    drawMaps();
+    drawTempo();
+    if (current && !recNow() && app.jobs.some(j => j.song === current && j.status === "done")) wantRec();
+  } catch (err) { /* the app was closed; keep trying quietly */ }
+  const busy = app.jobs.some(j => j.status === "queued" || j.status === "running");
+  pollTimer = setTimeout(refresh, busy ? 700 : 5000);
+}
+
+// ------------------------------------------------------------------- preview
+const pv = { chart: null, raf: 0, flash: [] };
+const LANES = { 4: ["#e8eaf2", "#6ea8ff", "#6ea8ff", "#e8eaf2"], 5: ["#e8eaf2", "#6ea8ff", "#ffd24a", "#6ea8ff", "#e8eaf2"],
+                6: ["#e8eaf2", "#6ea8ff", "#e8eaf2", "#e8eaf2", "#6ea8ff", "#e8eaf2"],
+                7: ["#e8eaf2", "#6ea8ff", "#e8eaf2", "#ffd24a", "#e8eaf2", "#6ea8ff", "#e8eaf2"] };
+async function preview(job) {
+  try { pv.chart = await chartOf(job); } catch (err) { return toast("Couldn't load that chart."); }
+  pv.job = job; pv.flash = new Array(pv.chart.keys).fill(0);
+  $("pvTitle").textContent = `${job.meta.artist} - ${job.meta.title} [${job.meta.version}]`;
+  const audio = $("audio");
+  audio.src = `/api/songs/${job.song}/audio`; audio.currentTime = 0; audio.playbackRate = +$("rate").value;
+  $("veil").classList.add("on"); $("play").textContent = "Play"; $("play").focus();
+  cancelAnimationFrame(pv.raf); pv.raf = requestAnimationFrame(frame);
+}
+function closePreview() { $("audio").pause(); $("audio").removeAttribute("src"); $("veil").classList.remove("on"); cancelAnimationFrame(pv.raf); pv.chart = null; }
+function frame() {
+  if (!pv.chart) return;
+  const chart = pv.chart, audio = $("audio"), t = audio.currentTime * 1000;
+  const canvas = $("field"), dpr = window.devicePixelRatio || 1, W = canvas.clientWidth, H = canvas.clientHeight;
+  if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)) { canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); }
+  const g = canvas.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const keys = chart.keys, lane = Math.min(72, (W - 20) / keys), x0 = (W - lane * keys) / 2, hitY = H - 70;
+  const speed = $("scroll").value / 100, y = ms => hitY - (ms - t) * speed, ahead = t + hitY / speed + 50, behind = t - (H - hitY) / speed - 50;
+  g.fillStyle = "#1f2229"; g.fillRect(x0, 0, lane * keys, H);
+  if (chart.kiai.some(([a, b]) => t >= a && t < b)) { g.fillStyle = "rgba(255,102,171,0.06)"; g.fillRect(x0, 0, lane * keys, H); }
+  // beat lines, one stretch of steady tempo at a time
+  const red = chart.lines || [[chart.offset, chart.beat]];
+  for (let i = 0; i < red.length; i++) {
+    const [from, beat] = red[i], until = i + 1 < red.length ? red[i + 1][0] : Infinity;
+    if (from > ahead || until < behind) continue;
+    for (let n = i ? Math.max(0, Math.ceil((behind - from) / beat)) : Math.ceil((behind - from) / beat);
+         from + n * beat < Math.min(ahead, until - 1); n++) {
+      const yy = y(from + n * beat);
+      g.fillStyle = n % 4 === 0 ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.08)"; g.fillRect(x0, yy - 0.5, lane * keys, 1);
+    }
+  }
+  g.fillStyle = "rgba(255,255,255,0.07)";
+  for (let c = 1; c < keys; c++) g.fillRect(x0 + c * lane - 0.5, 0, 1, H);
+  // notes: find the first that can still be on screen (long notes start early)
+  const notes = chart.notes, colors = LANES[keys], pad = lane * 0.08, nh = Math.max(10, lane * 0.3);
+  let lo = 0, hi = notes.length;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (notes[mid][0] < behind - 3000) lo = mid + 1; else hi = mid; }
+  for (let i = lo; i < notes.length && notes[i][0] <= ahead; i++) {          // long note bodies first
+    const [s, c, e] = notes[i];
+    if (e == null || e < behind) continue;
+    g.fillStyle = "rgba(255,210,74,0.55)"; g.fillRect(x0 + c * lane + lane * 0.22, y(e), lane * 0.56, y(s) - y(e));
+    g.fillStyle = "#ffd24a"; g.fillRect(x0 + c * lane + pad, y(e) - 3, lane - 2 * pad, 6);
+  }
+  for (let i = lo; i < notes.length && notes[i][0] <= ahead; i++) {
+    const [s, c, e] = notes[i];
+    if (s < behind) continue;
+    g.fillStyle = e == null ? colors[c] : "#ff9a3c";
+    g.beginPath(); g.roundRect(x0 + c * lane + pad, y(s) - nh / 2, lane - 2 * pad, nh, 4); g.fill();
+    if (!audio.paused && s <= t && s > t - 60) pv.flash[c] = 1;
+  }
+  // judgement line and key flashes
+  g.fillStyle = "rgba(255,255,255,0.85)"; g.fillRect(x0, hitY - 1, lane * keys, 2);
+  for (let c = 0; c < keys; c++) {
+    if (pv.flash[c] > 0.02) { g.fillStyle = `rgba(255,102,171,${0.5 * pv.flash[c]})`; g.fillRect(x0 + c * lane, hitY, lane, H - hitY); pv.flash[c] *= 0.86; }
+  }
+  $("clock").textContent = clock(t / 1000) + " / " + clock(chart.length / 1000);
+  if (!$("pos").matches(":active")) $("pos").value = Math.round(1000 * t / chart.length);
+  drawStrip($("strip"), chart, t);
+  pv.raf = requestAnimationFrame(frame);
+}
+$("play").addEventListener("click", () => { const a = $("audio"); a.paused ? a.play().catch(() => toast("The browser wouldn't play the audio.")) : a.pause(); });
+$("audio").addEventListener("play", () => $("play").textContent = "Pause");
+$("audio").addEventListener("pause", () => $("play").textContent = "Play");
+$("pos").addEventListener("input", () => { if (pv.chart) $("audio").currentTime = $("pos").value / 1000 * pv.chart.length / 1000; });
+$("rate").addEventListener("change", () => $("audio").playbackRate = +$("rate").value);
+$("scroll").addEventListener("change", remember);
+$("pvClose").addEventListener("click", closePreview);
+$("veil").addEventListener("click", ev => { if (ev.target === $("veil")) closePreview(); });
+window.addEventListener("keydown", ev => {
+  if (!pv.chart) return;
+  if (ev.key === "Escape") closePreview();
+  else if (ev.key === " " && ev.target.tagName !== "BUTTON" && ev.target.tagName !== "SELECT") { ev.preventDefault(); $("play").click(); }
+  else if (ev.key === "ArrowRight") $("audio").currentTime += 5;
+  else if (ev.key === "ArrowLeft") $("audio").currentTime -= 5;
+});
+window.addEventListener("resize", () => { for (const job of app.jobs) if (job.status === "done" && cards.has(job.id)) {
+  const spark = cards.get(job.id).el.querySelector(".spark"); if (spark) chartOf(job).then(c => drawStrip(spark, c)).catch(() => {}); } });
+
+// ---------------------------------------------------------------------- boot
+if (saved.stars) { $("stars").value = saved.stars; $("starsOut").textContent = (+saved.stars).toFixed(1) + "★"; }
+if (saved.creator) $("creator").value = saved.creator;
+if (saved.auto === false) $("auto").checked = false;
+if (saved.od) $("od").value = saved.od;
+if (saved.hp) $("hp").value = saved.hp;
+if (saved.scroll) $("scroll").value = saved.scroll;
+refresh();
+</script>
+</body>
+</html>
